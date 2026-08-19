@@ -12,6 +12,7 @@
 
 | Файл | Назначение |
 |---|---|
+| `install_zabbix_agent2.sh` | Установщик: агент + коллектор + ключи + еженедельное автообновление агента |
 | `vinchin_collect.py` | Скрипт-коллектор (Python 3 + openssl, **без pip-зависимостей**) |
 | `zabbix_agent2.d/userparameter_vinchin.conf` | UserParameter-ключи для агента |
 | `zbx_template_vinchin.xml` | Шаблон Zabbix, описания на русском (импорт в 7.4) |
@@ -43,6 +44,20 @@
 3. Скрипт отдаёт JSON; Zabbix разбирает его **зависимыми элементами** через JSONPath, а LLD автоматически создаёт элементы и триггеры для каждого задания/хранилища/узла.
 
 ## Установка
+
+### 0. Быстрая установка одной командой (install_zabbix_agent2.sh)
+
+```bash
+# настройки переопределяются переменными окружения
+ZABBIX_SERVER=10.0.0.10 ZABBIX_SERVER_ACTIVE=10.0.0.10:10051 bash install_zabbix_agent2.sh
+```
+
+Скрипт спросит имя хоста (по умолчанию — `hostname`), подключит репозиторий Zabbix 7.4,
+поставит `zabbix-agent2` (+ плагины), скачает коллектор и ключи из GitHub-репозитория,
+настроит конфиг/SELinux/firewalld и **включит еженедельное автообновление бинарника агента**
+(см. раздел ниже). Отключить автообновление: `AUTO_UPDATE=0 bash install_zabbix_agent2.sh`.
+
+Если установщик не используете — выполните шаги 1–5 вручную.
 
 ### 1. Установить Zabbix Agent 2 на Vinchin (Rocky 9)
 
@@ -170,6 +185,24 @@ python3 vinchin_collect.py summary --url https://host:54445 --username admin --p
 Если шаблон уже импортирован ранее, при повторном импорте:
 1. Отметьте для **Trigger prototypes** опцию **Delete missing** — иначе старый дублирующий триггер `Job {#JOB_NAME} last run failed` останется и продолжит создавать второе оповещение.
 2. Остальные правила можно оставить как есть (Create new / Update existing).
+
+## Автообновление zabbix-agent2 (раз в неделю)
+
+`install_zabbix_agent2.sh` ставит systemd-таймер `vinchin-agent-update.timer`, который **раз в неделю** (по умолчанию понедельник, 04:00, со случайной задержкой ±2 ч) запускает `/usr/local/sbin/vinchin-agent-update.sh`.
+
+Скрипт обновляет **только бинарник агента** (`dnf update -y zabbix-agent2`) — **конфиги не трогаются**: `/etc/zabbix/zabbix_agent2.conf`, `/etc/zabbix/zabbix_agent2.d/*` и коллектор остаются как есть (в RPM они объявлены `%config(noreplace)`, локальные правки dnf не перезаписывает). Служба перезапускается **только если версия изменилась**. Журнал: `/var/log/vinchin-agent-update.log` (с ротацией через logrotate).
+
+Управление:
+
+```bash
+systemctl list-timers vinchin-agent-update.timer   # расписание и последний запуск
+systemctl start vinchin-agent-update.service       # запустить обновление вручную
+systemctl disable --now vinchin-agent-update.timer # отключить автообновление
+```
+
+- День недели задаётся переменной `UPDATE_DAY` (например `UPDATE_DAY=Sun bash install_zabbix_agent2.sh`).
+- Коллектор `vinchin_collect.py` автообновлением **не** затрагивается — его выкладывайте с GitHub по необходимости.
+- Если новая версия агента требует обновления зависимостей, `dnf` обновит и их (это неизбежно и безопасно — полного `dnf upgrade` при этом не выполняется).
 
 ## Примечания
 

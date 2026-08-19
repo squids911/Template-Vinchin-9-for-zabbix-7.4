@@ -12,6 +12,7 @@ Works with Vinchin Backup & Recovery 9.x (tested on 9.0.0.92348, appliance OS �
 
 | File | Purpose |
 |---|---|
+| `install_zabbix_agent2.sh` | Installer: agent + collector + keys + weekly agent auto-update |
 | `vinchin_collect.py` | Collector script (Python 3 + openssl, **no pip dependencies**) |
 | `zabbix_agent2.d/userparameter_vinchin.conf` | UserParameter keys for the agent |
 | `zbx_template_vinchin.xml` | Zabbix template, Russian descriptions (import into 7.4) |
@@ -44,6 +45,20 @@ Works with Vinchin Backup & Recovery 9.x (tested on 9.0.0.92348, appliance OS �
 3. The script returns JSON; Zabbix parses it with **dependent items** via JSONPath, and LLD automatically creates items and triggers for each job/storage/node.
 
 ## Installation
+
+### 0. Quick install with one command (install_zabbix_agent2.sh)
+
+```bash
+# settings are overridden via environment variables
+ZABBIX_SERVER=10.0.0.10 ZABBIX_SERVER_ACTIVE=10.0.0.10:10051 bash install_zabbix_agent2.sh
+```
+
+The script asks for the host name (defaults to `hostname`), adds the Zabbix 7.4 repository,
+installs `zabbix-agent2` (+ plugins), downloads the collector and keys from the GitHub repository,
+configures config/SELinux/firewalld and **enables the weekly agent binary auto-update**
+(see below). Disable auto-update: `AUTO_UPDATE=0 bash install_zabbix_agent2.sh`.
+
+If you don't use the installer, follow steps 1–5 manually.
 
 ### 1. Install Zabbix Agent 2 on Vinchin (Rocky 9)
 
@@ -170,6 +185,24 @@ as soon as the problem expression becomes false again. No separate recovery expr
 If the template was imported before, on re-import:
 1. Enable **Delete missing** for **Trigger prototypes** — otherwise the old duplicate trigger `Job {#JOB_NAME} last run failed` will remain and keep producing a second alert.
 2. The other rules can be left as is (Create new / Update existing).
+
+## Weekly zabbix-agent2 auto-update
+
+`install_zabbix_agent2.sh` sets up a systemd timer `vinchin-agent-update.timer` that runs **once a week** (default: Monday, 04:00, with a ±2 h random delay) and executes `/usr/local/sbin/vinchin-agent-update.sh`.
+
+The script updates **only the agent binary** (`dnf update -y zabbix-agent2`) — **configs are not touched**: `/etc/zabbix/zabbix_agent2.conf`, `/etc/zabbix/zabbix_agent2.d/*` and the collector stay as they are (they are shipped as `%config(noreplace)` in the RPM, so local changes are not overwritten by dnf). The service is restarted **only if the version changed**. Log: `/var/log/vinchin-agent-update.log` (rotated via logrotate).
+
+Management:
+
+```bash
+systemctl list-timers vinchin-agent-update.timer   # schedule and last run
+systemctl start vinchin-agent-update.service       # run the update manually
+systemctl disable --now vinchin-agent-update.timer # disable auto-update
+```
+
+- The weekday is configurable via the `UPDATE_DAY` variable (e.g. `UPDATE_DAY=Sun bash install_zabbix_agent2.sh`).
+- The `vinchin_collect.py` collector is **not** affected by auto-update — deploy it from GitHub as needed.
+- If a new agent version requires dependency updates, `dnf` updates those too (unavoidable and safe — a full `dnf upgrade` is not performed).
 
 ## Notes
 

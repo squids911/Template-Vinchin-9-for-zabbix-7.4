@@ -12,6 +12,9 @@ ZABBIX_SERVER_ACTIVE="${ZABBIX_SERVER_ACTIVE:-37.17.55.196:10051}"
 HOST_METADATA="${HOST_METADATA:-Vinchin5611}"
 DEBUG_LEVEL="${DEBUG_LEVEL:-2}"
 REFRESH_CHECKS="${REFRESH_CHECKS:-60}"
+# --- автообновление бинарника агента (раз в неделю) ---
+UPDATE_DAY="${UPDATE_DAY:-Mon}"    # день недели: Mon..Sun
+AUTO_UPDATE="${AUTO_UPDATE:-1}"    # 1 — включить, 0 — отключить
 REPO_BASE="https://raw.githubusercontent.com/squids911/Template-Vinchin-9-for-zabbix-7.4/main"
 # ----------------------------------------------------------------
 
@@ -113,7 +116,110 @@ fi
 systemctl enable zabbix-agent2
 systemctl restart zabbix-agent2
 
-# 13. Финальная проверка
+# 13. Еженедельное автообновление БИНАРНИКА zabbix-agent2
+#     (обновляется только пакет агента; конфиги и коллектор не трогаются)
+case "$UPDATE_DAY" in
+    Mon|Tue|Wed|Thu|Fri|Sat|Sun) ;;
+    *) echo "WARN: UPDATE_DAY='${UPDATE_DAY}' некорректен — использую Mon"; UPDATE_DAY=Mon ;;
+esac
+
+if [[ "${AUTO_UPDATE}" == "1" ]]; then
+    echo "Настраиваем еженедельное автообновление zabbix-agent2 (день: ${UPDATE_DAY})..."
+
+    cat > /usr/local/sbin/vinchin-agent-update.sh <<'UPDATE_EOF'
+#!/bin/bash
+# Еженедельное обновление ТОЛЬКО бинарника zabbix-agent2 (пакет dnf).
+# Конфиги НЕ трогаются: /etc/zabbix/zabbix_agent2.conf,
+# /etc/zabbix/zabbix_agent2.d/* и /etc/zabbix/scripts/* — в RPM они объявлены
+# %config(noreplace), dnf не перезаписывает локальные правки.
+# Запускается таймером vinchin-agent-update.timer.
+
+set -uo pipefail
+
+PKG="zabbix-agent2"
+LOG="/var/log/vinchin-agent-update.log"
+
+log() { echo "[$(date '+%F %T')] $*"; echo "[$(date '+%F %T')] $*" >>"$LOG"; }
+
+log "=== update check started ==="
+
+if ! rpm -q "$PKG" >/dev/null 2>&1; then
+    log "ERROR: package $PKG is not installed"
+    exit 1
+fi
+
+before=$(rpm -q --qf '%{VERSION}-%{RELEASE}' "$PKG")
+
+if ! out=$(dnf update -y "$PKG" 2>&1); then
+    log "WARN: dnf update exited with an error"
+    echo "$out" >>"$LOG"
+    log "=== update check finished (with error) ==="
+    exit 1
+fi
+echo "$out" >>"$LOG"
+
+after=$(rpm -q --qf '%{VERSION}-%{RELEASE}' "$PKG")
+log "version: before=$before after=$after"
+
+if [ "$before" != "$after" ]; then
+    log "new version installed -> restarting zabbix-agent2 (configs untouched)"
+    systemctl restart zabbix-agent2 || { log "ERROR: failed to restart zabbix-agent2"; exit 1; }
+    log "restart OK"
+else
+    log "no new version, nothing to do"
+fi
+
+if systemctl --quiet is-active zabbix-agent2; then
+    log "zabbix-agent2: active"
+else
+    log "WARN: zabbix-agent2 is NOT active"
+fi
+
+log "=== update check finished ==="
+UPDATE_EOF
+    chmod 700 /usr/local/sbin/vinchin-agent-update.sh
+
+    cat > /etc/systemd/system/vinchin-agent-update.service <<'SERVICE_EOF'
+[Unit]
+Description=Weekly zabbix-agent2 binary update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vinchin-agent-update.sh
+SERVICE_EOF
+
+    cat > /etc/systemd/system/vinchin-agent-update.timer <<TIMER_EOF
+[Unit]
+Description=Run zabbix-agent2 update weekly
+
+[Timer]
+OnCalendar=${UPDATE_DAY} *-*-* 04:00:00
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+TIMER_EOF
+
+    cat > /etc/logrotate.d/vinchin-agent-update <<'LOGROTATE_EOF'
+/var/log/vinchin-agent-update.log {
+    monthly
+    rotate 3
+    missingok
+    notifempty
+    compress
+}
+LOGROTATE_EOF
+
+    systemctl daemon-reload
+    systemctl enable --now vinchin-agent-update.timer
+else
+    echo "Автообновление отключено (AUTO_UPDATE=${AUTO_UPDATE})."
+fi
+
+# 14. Финальная проверка
 echo ""
 echo "═══════════════════════════════════════════════════"
 systemctl status zabbix-agent2 --no-pager -l
@@ -129,6 +235,14 @@ echo "📋 Файлы Vinchin API:"
 echo "   /etc/zabbix/scripts/vinchin_collect.py"
 echo "   /etc/zabbix/zabbix_agent2.d/userparameter_vinchin.conf"
 echo ""
+if [[ "${AUTO_UPDATE}" == "1" ]]; then
+    echo "🔄 Автообновление бинарника агента (только пакет, раз в неделю — ${UPDATE_DAY}):"
+    echo "   Таймер:   systemctl list-timers vinchin-agent-update.timer"
+    echo "   Вручную:  systemctl start vinchin-agent-update.service"
+    echo "   Журнал:   /var/log/vinchin-agent-update.log"
+    echo "   Отключить: systemctl disable --now vinchin-agent-update.timer"
+    echo ""
+fi
 echo "⚠️  Не забудьте в Zabbix:"
 echo "   1. Импортировать шаблон vinchin/zbx_template_vinchin.xml"
 echo "   2. Назначить шаблон хосту '${SYSTEM_HOSTNAME}'"
