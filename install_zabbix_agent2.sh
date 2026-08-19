@@ -12,7 +12,7 @@ ZABBIX_SERVER_ACTIVE="${ZABBIX_SERVER_ACTIVE:-37.17.55.196:10051}"
 HOST_METADATA="${HOST_METADATA:-Vinchin5611}"
 DEBUG_LEVEL="${DEBUG_LEVEL:-2}"
 REFRESH_CHECKS="${REFRESH_CHECKS:-60}"
-REPO_BASE="https://raw.githubusercontent.com/squids911/Template-Vinchin-9-for-zabbix-7.4/main/vinchin"
+REPO_BASE="https://raw.githubusercontent.com/squids911/Template-Vinchin-9-for-zabbix-7.4/main"
 # ----------------------------------------------------------------
 
 # 1. Ручной ввод имени хоста
