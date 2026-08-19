@@ -1,0 +1,162 @@
+# Мониторинг Vinchin Backup & Recovery 9 через Zabbix 7.4 (Agent 2)
+
+Готовое решение: агент Zabbix опрашивает **REST API Vinchin v9** (`/api/v1/*`)
+и передаёт в Zabbix данные о **состоянии системы, хранилищ и заданий**.
+
+Параметры подключения **не хранятся в файлах** — они задаются **макросами хоста** в Zabbix
+(`{$VINCHIN.URL}`, `{$VINCHIN.USERNAME}`, `{$VINCHIN.PASSWORD}`) и подставляются в ключи элементов.
+
+Работает на Vinchin Backup & Recovery 9.x (проверено на 9.0.0.92348, ОС апплайнса — Rocky 9).
+
+## Состав
+
+| Файл | Назначение |
+|---|---|
+| `vinchin_collect.py` | Скрипт-коллектор (Python 3 + openssl, **без pip-зависимостей**) |
+| `zabbix_agent2.d/userparameter_vinchin.conf` | UserParameter-ключи для агента |
+| `zbx_template_vinchin.xml` | Шаблон Zabbix, описания на русском (импорт в 7.4) |
+| `zbx_template_vinchin_en.xml` | Шаблон Zabbix, описания на английском (импорт в 7.4) |
+| `README.md` / `README.en.md` | Инструкция (русская / английская) |
+
+> Оба шаблона — это один и тот же шаблон на двух языках: структура и UUID идентичны, отличаются только описания. Импортируйте один из них.
+
+## Что мониторится
+
+**Система (состояние):**
+- узлы Vinchin: онлайн/офлайн, версия, число офлайн-модулей сервисов;
+- аптайм, текущие/исторические задачи, статус авторизации/лицензии;
+- *(опционально)* CPU/RAM/диски ОС — стандартным шаблоном `Linux by Zabbix agent`, если агент стоит на самом Vinchin.
+
+**Хранилища:**
+- каждое хранилище: статус (online/offline), занято % и байты, всего/свободно;
+- триггеры: офлайн, занято > 85% (warning), > 95% (high).
+
+**Задания (бэкапы):**
+- счётчики: running / waiting / failed / abnormal, отказов за 24 ч;
+- по каждому заданию (LLD): текущий статус, статус последнего запуска, время и длительность последнего прогона;
+- триггеры: задание Failed/Abnormal, последний запуск завершился ошибкой.
+
+## Как это устроено
+
+1. Агент (UserParameter `vinchin.*`) запускает `vinchin_collect.py`, передавая ему URL, логин и пароль (из макросов хоста, через параметры ключа).
+2. Скрипт логинится в Vinchin (`POST /api/v1/login`: RSA-шифрование логина/пароля + AES-подпись запроса), токен кэшируется в `/var/tmp/vinchin_zabbix_token.json` (10 мин), при протухании — автоматический re-login.
+3. Скрипт отдаёт JSON; Zabbix разбирает его **зависимыми элементами** через JSONPath, а LLD автоматически создаёт элементы и триггеры для каждого задания/хранилища/узла.
+
+## Установка
+
+### 1. Установить Zabbix Agent 2 на Vinchin (Rocky 9)
+
+```bash
+rpm -Uvh https://repo.zabbix.com/zabbix/7.4/release/rhel/9/noarch/zabbix-release-latest.el9.noarch.rpm
+dnf install -y zabbix-agent2
+```
+
+*(Если трогать апплайнс нельзя — поставьте агент на любой Linux-хост с доступом к Vinchin по HTTPS.)*
+
+### 2. Разложить файлы
+
+```bash
+mkdir -p /etc/zabbix/scripts /etc/zabbix/zabbix_agent2.d
+
+# скрипт
+cp vinchin_collect.py /etc/zabbix/scripts/
+chmod 755 /etc/zabbix/scripts/vinchin_collect.py
+
+# ключи агента
+cp zabbix_agent2.d/userparameter_vinchin.conf /etc/zabbix/zabbix_agent2.d/
+```
+
+### 3. Настроить агента
+
+В `/etc/zabbix/zabbix_agent2.conf`:
+
+```
+Server=<IP_Zabbix_сервера>
+ServerActive=<IP_Zabbix_сервера>
+Hostname=<уникальное_имя_хоста>
+Timeout=15
+```
+
+Перезапустить:
+
+```bash
+systemctl enable --now zabbix-agent2
+```
+
+### 4. Проверить ключ (для отладки)
+
+```bash
+zabbix_agent2 -t 'vinchin.summary[https://IP_vinchin:54445,admin,b64:<base64_пароля>]'
+```
+
+(В продуктивной установке агент работает под пользователем `zabbix`; если проверяете `-t` от root на Debian/Ubuntu — запускайте `sudo -u zabbix zabbix_agent2 -t ...`.)
+
+### 5. На стороне Zabbix
+
+1. **Data collection → Templates → Import** → импортировать `zbx_template_vinchin.xml` (или `zbx_template_vinchin_en.xml` для английских описаний).
+2. **Data collection → Hosts → Create host**: имя хоста = `Hostname` из конфига агента, интерфейс = IP Vinchin (порт 10050).
+3. Прилинкуйте шаблон `Linux by Zabbix agent` (CPU/RAM/диски ОС), если агент на Vinchin.
+4. Прилинкуйте шаблон **«Vinchin Backup and Recovery by API»** к хосту.
+5. **Задайте макросы хоста** (Host → Macros → Inherited and host macros):
+
+   | Макрос | Значение |
+   |---|---|
+   | `{$VINCHIN.URL}` | `https://<IP_или_имя_Vinchin>:54445` |
+   | `{$VINCHIN.USERNAME}` | логин, например `admin` |
+   | `{$VINCHIN.PASSWORD}` | `b64:<base64_пароля>` |
+
+6. Через 1–5 минут появятся данные; LLD создаст элементы/триггеры для заданий, хранилищ и узлов.
+
+## Макрос `{$VINCHIN.PASSWORD}` и `b64:`
+
+Zabbix запрещает в ключах элементов ряд символов (`!`, `#`, `@` и др.), поэтому пароль
+передаётся **в base64** с префиксом `b64:` — скрипт сам декодирует его обратно.
+
+Закодируйте пароль:
+
+```bash
+echo -n 'ВашПароль' | base64
+```
+
+и в макросе укажите `b64:<результат>`, например `b64:IVYzYjcjTHI=`. Пробелы в начале/конце не добавляйте.
+
+- Если логин тоже содержит спецсимволы (например, e-mail) — задайте его так же: `b64:<base64>`.
+- Макрос `{$VINCHIN.PASSWORD}` объявлен в шаблоне как **secret** (SECRET_TEXT) — в веб-интерфейсе его значение скрыто и не попадает в экспорт шаблона.
+
+## Справочник ключей (UserParameter)
+
+| Ключ | Возвращает |
+|---|---|
+| `vinchin.summary[url,user,pass]` | JSON-сводка (задания, хранилище, аптайм, авторизация) |
+| `vinchin.jobs[url,user,pass]` | JSON: текущие задания + статус/результат последнего запуска |
+| `vinchin.storages[url,user,pass]` | JSON: хранилища (статус, всего/свободно/занято, %) |
+| `vinchin.nodes[url,user,pass]` | JSON: узлы (онлайн, версия, офлайн-модули) |
+
+Discovery (`vinchin.discover.*`) не нужен: правила обнаружения в шаблоне — **зависимые**
+от перечисленных выше master-элементов и берут данные из их JSON.
+
+## Настройки скрипта (для ручного запуска/отладки)
+
+```bash
+python3 vinchin_collect.py summary --url https://host:54445 --username admin --password 'b64:IVYzYjcjTHI='
+```
+
+Команды: `summary` | `jobs` | `storages` | `nodes`.
+Альтернативы (fallback): `--config /path.json` или переменные `VINCHIN_URL` / `VINCHIN_USERNAME` / `VINCHIN_PASSWORD`.
+
+## Триггеры шаблона
+
+- **High:** задание Failed/Abnormal; последний запуск задания с ошибкой; узел офлайн; хранилище офлайн; занятость хранилища ≥ 95%; проблема авторизации.
+- **Average:** отказ бэкапа за последние 24 ч.
+- **Warning:** занятость хранилища ≥ 85%; у узла есть офлайн-модули; нет данных 5 минут.
+
+Пороги меняются макросами `{$VINCHIN.STORAGE.USED.WARN}` / `{$VINCHIN.STORAGE.USED.HIGH}`.
+
+## Примечания
+
+- У Vinchin **самоподписанный HTTPS-сертификат** — скрипт использует TLS без проверки сертификата (как и сам веб-интерфейс).
+- Токен Vinchin живёт ~15 минут бездействия; скрипт сам перелогинивается (код ошибки 910086/910087).
+- Для API нужен заголовок `Accept: application/json` и `User-Agent` браузера — скрипт это учитывает.
+- Если заданий/хранилищ больше 500 — увеличьте `limit` в командах `jobs`/`storages`/`nodes` внутри скрипта.
+- Кэш токена (`/var/tmp/vinchin_zabbix_token.json`) содержит только временный токен сессии, не пароль.
+- Рекомендуется завести в Vinchin отдельного пользователя с ролью «наблюдатель» (global observer, v9) для мониторинга.

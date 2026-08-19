@@ -1,0 +1,887 @@
+<?xml version='1.0' encoding='utf-8'?>
+<zabbix_export>
+    <version>7.0</version>
+    <template_groups>
+        <template_group>
+            <uuid>eb29e26a12ee432198f4868aafbad732</uuid>
+            <name>Templates/Applications</name>
+        </template_group>
+    </template_groups>
+    <templates>
+        <template>
+            <uuid>97192383af524aaabace9d884e5b1cb9</uuid>
+            <template>Vinchin Backup and Recovery by API</template>
+            <name>Vinchin Backup and Recovery by API</name>
+            <description>Monitors Vinchin Backup &amp; Recovery v9 (system state, storages and jobs) via the REST API. Requires Zabbix Agent 2 with the vinchin.* keys and the /etc/zabbix/scripts/vinchin_collect.py script.</description>
+            <groups>
+                <group>
+                    <name>Templates/Applications</name>
+                </group>
+            </groups>
+            <items>
+                <item>
+                    <uuid>34d305e465f340978562aaa2768348d0</uuid>
+                    <name>Vinchin: Summary JSON</name>
+                    <type>ZABBIX_PASSIVE</type>
+                    <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    <delay>1m</delay>
+                    <history>7d</history>
+                    <trends>0</trends>
+                    <value_type>TEXT</value_type>
+                    <triggers>
+                        <trigger>
+                            <uuid>7632a3c50601422db33022b9b61ea81b</uuid>
+                            <expression>nodata(/Vinchin Backup and Recovery by API/vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}],5m)=1</expression>
+                            <name>Vinchin: no data collected</name>
+                            <priority>WARNING</priority>
+                            <description>No data received for 5 minutes — check the agent, config and API availability.</description>
+                        </trigger>
+                    </triggers>
+                </item>
+                <item>
+                    <uuid>59ad26549fb14ad190a3e530447536c8</uuid>
+                    <name>Vinchin: Jobs JSON</name>
+                    <type>ZABBIX_PASSIVE</type>
+                    <key>vinchin.jobs[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    <delay>5m</delay>
+                    <history>7d</history>
+                    <trends>0</trends>
+                    <value_type>TEXT</value_type>
+                </item>
+                <item>
+                    <uuid>2217b1083fff4e72a8fcad8f4a864558</uuid>
+                    <name>Vinchin: Storages JSON</name>
+                    <type>ZABBIX_PASSIVE</type>
+                    <key>vinchin.storages[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    <delay>5m</delay>
+                    <history>7d</history>
+                    <trends>0</trends>
+                    <value_type>TEXT</value_type>
+                </item>
+                <item>
+                    <uuid>b80bc186bfd74cfeae21162c6cb4ee6d</uuid>
+                    <name>Vinchin: Nodes JSON</name>
+                    <type>ZABBIX_PASSIVE</type>
+                    <key>vinchin.nodes[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    <delay>5m</delay>
+                    <history>7d</history>
+                    <trends>0</trends>
+                    <value_type>TEXT</value_type>
+                </item>
+                <item>
+                    <uuid>20290f95e4154e24b57cfda57b34a35d</uuid>
+                    <name>Vinchin: Jobs running</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.jobs.running</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.running_num</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>07c37534bd5545959b4af9d790845a8a</uuid>
+                    <name>Vinchin: Jobs waiting</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.jobs.waiting</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.waiting_num</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>21101be648524c91bf923506491f6db2</uuid>
+                    <name>Vinchin: Jobs failed (total)</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.jobs.failed_total</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.fail_num</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>8f5634f8236f4ff98ad25095bcd694f9</uuid>
+                    <name>Vinchin: Jobs abnormal</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.jobs.abnormal</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.abnormal_num</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>f1cbca1c02d44dcf8e13da72e4a4c612</uuid>
+                    <name>Vinchin: Jobs failed (24h)</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.jobs.failed_24h</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.failed_24h</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                    <triggers>
+                        <trigger>
+                            <uuid>9dbbc949b5644506acba2cfc3712b994</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.jobs.failed_24h)&gt;0</expression>
+                            <name>Vinchin: backup jobs failed in last 24h</name>
+                            <priority>AVERAGE</priority>
+                            <description>Some jobs finished with an error in the last 24 hours.</description>
+                        </trigger>
+                    </triggers>
+                </item>
+                <item>
+                    <uuid>60a6b05cc6ff4d08920a284108b5a43e</uuid>
+                    <name>Vinchin: Current tasks</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.tasks.current</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.current_task_num</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>730e71633e1e44ca9fcb7de40111aa3a</uuid>
+                    <name>Vinchin: History tasks</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.tasks.history</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.history_task_num</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>59afb17602bd4e1c89324d42fd59ada1</uuid>
+                    <name>Vinchin: Uptime (days)</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.uptime_days</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.uptime_days</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>90534cb2104e484d8f8578690bf6f991</uuid>
+                    <name>Vinchin: Storage count</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.storage.count</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.storage_num</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>a4caf6dd63d140e0b033eb83f143f217</uuid>
+                    <name>Vinchin: Storage total</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.storage.total</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>B</units>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.total_capacity_bytes</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>5b7064093a964b0d8e85a92c590a7606</uuid>
+                    <name>Vinchin: Storage used</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.storage.used</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>B</units>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.used_capacity_bytes</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>e8d7c20d9a8d42738e45299701f13b63</uuid>
+                    <name>Vinchin: Storage free</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.storage.free</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <units>B</units>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.remaining_capacity_bytes</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>e2ce0ee96a744ece86d50b6d76ba33fc</uuid>
+                    <name>Vinchin: Storage used, %</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.storage.used_pct</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>FLOAT</value_type>
+                    <units>%</units>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.used_pct</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                </item>
+                <item>
+                    <uuid>e8321a49e0e04de3b547349584ff8ca7</uuid>
+                    <name>Vinchin: Authorization</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.auth</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <valuemap>
+                        <name>Vinchin online</name>
+                    </valuemap>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.auth_status</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                    <triggers>
+                        <trigger>
+                            <uuid>7a25c3d6adaa44bc8246f58d47eced43</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.auth)=0</expression>
+                            <name>Vinchin: authorization problem</name>
+                            <priority>HIGH</priority>
+                            <description>Vinchin authorization/license is not active.</description>
+                        </trigger>
+                    </triggers>
+                </item>
+            </items>
+            <discovery_rules>
+                <discovery_rule>
+                    <uuid>dae2afb8a86444c5969f22726b349483</uuid>
+                    <name>Vinchin jobs discovery</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.jobs.discovery</key>
+                    <delay>0</delay>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.rows</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.jobs[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                    <lld_macro_paths>
+                        <lld_macro_path>
+                            <lld_macro>{#JOB_UUID}</lld_macro>
+                            <path>$.job_uuid</path>
+                        </lld_macro_path>
+                        <lld_macro_path>
+                            <lld_macro>{#JOB_NAME}</lld_macro>
+                            <path>$.job_name</path>
+                        </lld_macro_path>
+                    </lld_macro_paths>
+                    <item_prototypes>
+                        <item_prototype>
+                            <uuid>e578751e4af746039d95a4be3bf2714f</uuid>
+                            <name>Job {#JOB_NAME}: Status</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.job.status[{#JOB_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>0</trends>
+                            <value_type>UNSIGNED</value_type>
+                            <valuemap>
+                                <name>Vinchin job status</name>
+                            </valuemap>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.job_uuid == "{#JOB_UUID}")].status.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.jobs[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>3f43858d1e5c4e6995b3da3161c57d6b</uuid>
+                            <name>Job {#JOB_NAME}: Last result</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.job.last_result[{#JOB_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>0</trends>
+                            <value_type>UNSIGNED</value_type>
+                            <valuemap>
+                                <name>Vinchin last result</name>
+                            </valuemap>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.job_uuid == "{#JOB_UUID}")].last_result.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.jobs[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>f062a99848e9488689135e140e68553b</uuid>
+                            <name>Job {#JOB_NAME}: Last run start</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.job.last_start[{#JOB_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.job_uuid == "{#JOB_UUID}")].last_start_time.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.jobs[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                    </item_prototypes>
+                    <trigger_prototypes>
+                        <trigger_prototype>
+                            <uuid>1e1c9e21752545c2804fb5421abfc59c</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.job.status[{#JOB_UUID}])&gt;=4</expression>
+                            <name>Vinchin: Job {#JOB_NAME} failed</name>
+                            <priority>HIGH</priority>
+                            <description>The job is currently in the Failed (4) or Abnormal (5) state.</description>
+                        </trigger_prototype>
+                        <trigger_prototype>
+                            <uuid>80e932e822a54f92bc1da57af52cb34a</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.job.last_result[{#JOB_UUID}])=1</expression>
+                            <name>Vinchin: Job {#JOB_NAME} last run failed</name>
+                            <priority>HIGH</priority>
+                            <description>The last job run finished with an error.</description>
+                        </trigger_prototype>
+                    </trigger_prototypes>
+                </discovery_rule>
+                <discovery_rule>
+                    <uuid>7f82e128eb4a4106adef647c4c06c87e</uuid>
+                    <name>Vinchin storages discovery</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.storages.discovery</key>
+                    <delay>0</delay>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.rows</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.storages[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                    <lld_macro_paths>
+                        <lld_macro_path>
+                            <lld_macro>{#STORAGE_UUID}</lld_macro>
+                            <path>$.storage_uuid</path>
+                        </lld_macro_path>
+                        <lld_macro_path>
+                            <lld_macro>{#STORAGE_NAME}</lld_macro>
+                            <path>$.storage_name</path>
+                        </lld_macro_path>
+                    </lld_macro_paths>
+                    <item_prototypes>
+                        <item_prototype>
+                            <uuid>2bab9f817e5b4e72b6aa8e7ec3856b3d</uuid>
+                            <name>Storage {#STORAGE_NAME}: Status</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.storage.status[{#STORAGE_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>0</trends>
+                            <value_type>UNSIGNED</value_type>
+                            <valuemap>
+                                <name>Vinchin online</name>
+                            </valuemap>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.storage_uuid == "{#STORAGE_UUID}")].status.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.storages[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>ab1585b3c73449b18347d1d8ba9b4c8a</uuid>
+                            <name>Storage {#STORAGE_NAME}: Used, %</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.storage.used_pct[{#STORAGE_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>365d</trends>
+                            <value_type>FLOAT</value_type>
+                            <units>%</units>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.storage_uuid == "{#STORAGE_UUID}")].used_pct.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.storages[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>ae36d818a3c34222a44054291d87deb5</uuid>
+                            <name>Storage {#STORAGE_NAME}: Total</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.storage.total[{#STORAGE_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>365d</trends>
+                            <value_type>UNSIGNED</value_type>
+                            <units>B</units>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.storage_uuid == "{#STORAGE_UUID}")].total_bytes.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.storages[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>840bbd1de0f0450b86b0a757d2dfcd75</uuid>
+                            <name>Storage {#STORAGE_NAME}: Free</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.storage.free[{#STORAGE_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>365d</trends>
+                            <value_type>UNSIGNED</value_type>
+                            <units>B</units>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.storage_uuid == "{#STORAGE_UUID}")].free_bytes.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.storages[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                    </item_prototypes>
+                    <trigger_prototypes>
+                        <trigger_prototype>
+                            <uuid>e59e6e25748f4333899df947a0040ee7</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.storage.status[{#STORAGE_UUID}])=0</expression>
+                            <name>Vinchin: Storage {#STORAGE_NAME} offline</name>
+                            <priority>DISASTER</priority>
+                            <description>The storage is offline (unmounted/unavailable).</description>
+                        </trigger_prototype>
+                        <trigger_prototype>
+                            <uuid>373f4326308940f1b435f3665a899bd5</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.storage.used_pct[{#STORAGE_UUID}])&gt;={$VINCHIN.STORAGE.USED.HIGH}</expression>
+                            <name>Vinchin: Storage {#STORAGE_NAME} usage critically high</name>
+                            <priority>HIGH</priority>
+                            <description>Storage usage is &gt;= {$VINCHIN.STORAGE.USED.HIGH}% of capacity.</description>
+                        </trigger_prototype>
+                        <trigger_prototype>
+                            <uuid>4e2ab31672c64a0ab34dd2cb5aa7f570</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.storage.used_pct[{#STORAGE_UUID}])&gt;={$VINCHIN.STORAGE.USED.WARN}</expression>
+                            <name>Vinchin: Storage {#STORAGE_NAME} usage high</name>
+                            <priority>WARNING</priority>
+                            <description>Storage usage is &gt;= {$VINCHIN.STORAGE.USED.WARN}% of capacity.</description>
+                        </trigger_prototype>
+                    </trigger_prototypes>
+                </discovery_rule>
+                <discovery_rule>
+                    <uuid>d2b9f5bca1304e4289cefe479b5d694c</uuid>
+                    <name>Vinchin nodes discovery</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.nodes.discovery</key>
+                    <delay>0</delay>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.rows</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.nodes[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
+                    <lld_macro_paths>
+                        <lld_macro_path>
+                            <lld_macro>{#NODE_UUID}</lld_macro>
+                            <path>$.node_uuid</path>
+                        </lld_macro_path>
+                        <lld_macro_path>
+                            <lld_macro>{#NODE_NAME}</lld_macro>
+                            <path>$.node_name</path>
+                        </lld_macro_path>
+                        <lld_macro_path>
+                            <lld_macro>{#NODE_IP}</lld_macro>
+                            <path>$.ip</path>
+                        </lld_macro_path>
+                    </lld_macro_paths>
+                    <item_prototypes>
+                        <item_prototype>
+                            <uuid>ed850b4978a44386a446944cd5c47b09</uuid>
+                            <name>Node {#NODE_NAME}: Online</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.node.online[{#NODE_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>0</trends>
+                            <value_type>UNSIGNED</value_type>
+                            <valuemap>
+                                <name>Vinchin online</name>
+                            </valuemap>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.node_uuid == "{#NODE_UUID}")].online.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.nodes[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>5d69dd4c68864f10b97ed546f653e219</uuid>
+                            <name>Node {#NODE_NAME}: Modules offline</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.node.modules_offline[{#NODE_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>0</trends>
+                            <value_type>UNSIGNED</value_type>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.node_uuid == "{#NODE_UUID}")].modules_offline.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.nodes[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                        <item_prototype>
+                            <uuid>317668fdf7194df291a223c37b7a0eec</uuid>
+                            <name>Node {#NODE_NAME}: Version</name>
+                            <type>DEPENDENT</type>
+                            <key>vinchin.node.version[{#NODE_UUID}]</key>
+                            <delay>0</delay>
+                            <history>30d</history>
+                            <trends>0</trends>
+                            <value_type>TEXT</value_type>
+                            <preprocessing>
+                                <step>
+                                    <type>JSONPATH</type>
+                                    <parameters>
+                                        <parameter>$.rows[?(@.node_uuid == "{#NODE_UUID}")].version.first()</parameter>
+                                    </parameters>
+                                    <error_handler>DISCARD_VALUE</error_handler>
+                                </step>
+                            </preprocessing>
+                            <master_item>
+                                <key>vinchin.nodes[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                            </master_item>
+                        </item_prototype>
+                    </item_prototypes>
+                    <trigger_prototypes>
+                        <trigger_prototype>
+                            <uuid>28800b2d5aea4a209ffc2628864c37e4</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.node.online[{#NODE_UUID}])=0</expression>
+                            <name>Vinchin: Node {#NODE_NAME} offline</name>
+                            <priority>HIGH</priority>
+                            <description>The Vinchin node is unreachable.</description>
+                        </trigger_prototype>
+                        <trigger_prototype>
+                            <uuid>bc7f4fb2cd354768be4b927c08f09ec2</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.node.modules_offline[{#NODE_UUID}])&gt;0</expression>
+                            <name>Vinchin: Node {#NODE_NAME} has offline modules</name>
+                            <priority>WARNING</priority>
+                            <description>Some service modules of the node are offline.</description>
+                        </trigger_prototype>
+                    </trigger_prototypes>
+                </discovery_rule>
+            </discovery_rules>
+            <macros>
+                <macro>
+                    <macro>{$VINCHIN.URL}</macro>
+                    <value>https://127.0.0.1:54445</value>
+                </macro>
+                <macro>
+                    <macro>{$VINCHIN.USERNAME}</macro>
+                    <value>admin</value>
+                </macro>
+                <macro>
+                    <macro>{$VINCHIN.PASSWORD}</macro>
+                    <value />
+                    <type>SECRET_TEXT</type>
+                </macro>
+                <macro>
+                    <macro>{$VINCHIN.STORAGE.USED.WARN}</macro>
+                    <value>85</value>
+                </macro>
+                <macro>
+                    <macro>{$VINCHIN.STORAGE.USED.HIGH}</macro>
+                    <value>95</value>
+                </macro>
+            </macros>
+            <valuemaps>
+                <valuemap>
+                    <uuid>2386f1f0abfc4793a136ea809634f997</uuid>
+                    <name>Vinchin job status</name>
+                    <mappings>
+                        <mapping>
+                            <value>0</value>
+                            <newvalue>Completed</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>1</value>
+                            <newvalue>Running</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>2</value>
+                            <newvalue>Pending</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>3</value>
+                            <newvalue>Stopped/Paused</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>4</value>
+                            <newvalue>Failed</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>5</value>
+                            <newvalue>Abnormal</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>99</value>
+                            <newvalue>Unknown</newvalue>
+                        </mapping>
+                    </mappings>
+                </valuemap>
+                <valuemap>
+                    <uuid>b8c43d775b234fa2bb1e96609448273a</uuid>
+                    <name>Vinchin last result</name>
+                    <mappings>
+                        <mapping>
+                            <value>0</value>
+                            <newvalue>Success</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>1</value>
+                            <newvalue>Failed</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>2</value>
+                            <newvalue>No data</newvalue>
+                        </mapping>
+                    </mappings>
+                </valuemap>
+                <valuemap>
+                    <uuid>da445872ee254a2294e8d3a004c8b8b1</uuid>
+                    <name>Vinchin online</name>
+                    <mappings>
+                        <mapping>
+                            <value>0</value>
+                            <newvalue>Offline</newvalue>
+                        </mapping>
+                        <mapping>
+                            <value>1</value>
+                            <newvalue>Online</newvalue>
+                        </mapping>
+                    </mappings>
+                </valuemap>
+            </valuemaps>
+        </template>
+    </templates>
+</zabbix_export>
