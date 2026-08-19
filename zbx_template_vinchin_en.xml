@@ -177,13 +177,35 @@
                     <master_item>
                         <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
                     </master_item>
+                </item>
+                <item>
+                    <uuid>67baa366bb2b4a53b623d90c9a8d7f4c</uuid>
+                    <name>Vinchin: Jobs failed (last run)</name>
+                    <type>DEPENDENT</type>
+                    <key>vinchin.jobs.failed_last</key>
+                    <delay>0</delay>
+                    <history>7d</history>
+                    <trends>365d</trends>
+                    <value_type>UNSIGNED</value_type>
+                    <preprocessing>
+                        <step>
+                            <type>JSONPATH</type>
+                            <parameters>
+                                <parameter>$.jobs_failed_last</parameter>
+                            </parameters>
+                            <error_handler>DISCARD_VALUE</error_handler>
+                        </step>
+                    </preprocessing>
+                    <master_item>
+                        <key>vinchin.summary[{$VINCHIN.URL},{$VINCHIN.USERNAME},{$VINCHIN.PASSWORD}]</key>
+                    </master_item>
                     <triggers>
                         <trigger>
                             <uuid>9dbbc949b5644506acba2cfc3712b994</uuid>
-                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.jobs.failed_24h)&gt;0</expression>
-                            <name>Vinchin: backup jobs failed in last 24h</name>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.jobs.failed_last)&gt;0</expression>
+                            <name>Vinchin: backup jobs failed</name>
                             <priority>AVERAGE</priority>
-                            <description>Some jobs finished with an error in the last 24 hours.</description>
+                            <description>One or more jobs finished with an error in their last run. The problem clears automatically once those jobs complete successfully again.</description>
                         </trigger>
                     </triggers>
                 </item>
@@ -508,17 +530,17 @@
                     <trigger_prototypes>
                         <trigger_prototype>
                             <uuid>1e1c9e21752545c2804fb5421abfc59c</uuid>
-                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.job.status[{#JOB_UUID}])&gt;=4</expression>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.job.status[{#JOB_UUID}])&gt;=4 and last(/Vinchin Backup and Recovery by API/vinchin.job.status[{#JOB_UUID}])&lt;&gt;99 or last(/Vinchin Backup and Recovery by API/vinchin.job.last_result[{#JOB_UUID}])=1</expression>
                             <name>Vinchin: Job {#JOB_NAME} failed</name>
                             <priority>HIGH</priority>
-                            <description>The job is currently in the Failed (4) or Abnormal (5) state.</description>
+                            <description>The job is in the Failed/Abnormal state or its last run finished with an error. The problem clears automatically once the job runs successfully.</description>
                         </trigger_prototype>
                         <trigger_prototype>
-                            <uuid>80e932e822a54f92bc1da57af52cb34a</uuid>
-                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.job.last_result[{#JOB_UUID}])=1</expression>
-                            <name>Vinchin: Job {#JOB_NAME} last run failed</name>
-                            <priority>HIGH</priority>
-                            <description>The last job run finished with an error.</description>
+                            <uuid>95cce11e11d045efb23c858c2889c104</uuid>
+                            <expression>last(/Vinchin Backup and Recovery by API/vinchin.job.status[{#JOB_UUID}])=3</expression>
+                            <name>Vinchin: Job {#JOB_NAME} is stopped or paused</name>
+                            <priority>WARNING</priority>
+                            <description>The job is stopped or paused — backups are not running on schedule.</description>
                         </trigger_prototype>
                     </trigger_prototypes>
                 </discovery_rule>
@@ -794,7 +816,7 @@
             <macros>
                 <macro>
                     <macro>{$VINCHIN.URL}</macro>
-                    <value>https://127.0.0.1:443</value>
+                    <value>https://127.0.0.1:54445</value>
                 </macro>
                 <macro>
                     <macro>{$VINCHIN.USERNAME}</macro>

@@ -343,10 +343,11 @@ def cmd_summary(c: VinchinClient):
     used = (s.get("used_capacity") or {}).get("size", 0)
     free = (s.get("remaining_capacity") or {}).get("size", 0)
     used_pct = round(used * 100.0 / total, 2) if total else 0
-    # неудачные задания за 24 ч
+    # неудачные задания: за 24 ч и по последнему запуску
     failed_24h = 0
+    jobs_failed_last = 0
     try:
-        h = c.get("/api/v1/jobs/history", {"limit": 500, "offset": 0})
+        h = c.get("/api/v1/jobs/history", {"limit": 1000, "offset": 0})
         cutoff = time.time() - 86400
         for r in h.get("rows", []):
             st = r.get("start_time", "")
@@ -357,6 +358,17 @@ def cmd_summary(c: VinchinClient):
             if tt and tt >= cutoff and (r.get("job_status") or "").strip().lower() in \
                     ("failed", "error", "abnormal"):
                 failed_24h += 1
+        # история идёт от новых к старым -> первый попавшийся = последний запуск задания
+        hist = {}
+        for r in h.get("rows", []):
+            nm = r.get("job_name")
+            if nm and nm not in hist:
+                hist[nm] = r
+        jobs = c.get("/api/v1/jobs", {"limit": 500, "offset": 0})
+        for r in jobs.get("rows", []):
+            last = hist.get(r.get("job_name")) or {}
+            if (last.get("job_status") or "").strip().lower() in ("failed", "error", "abnormal"):
+                jobs_failed_last += 1
     except Exception:
         pass
     out = {
@@ -366,6 +378,7 @@ def cmd_summary(c: VinchinClient):
         "abnormal_num": j.get("abnormal_num", 0),
         "fail_num": j.get("fail_num", 0),
         "failed_24h": failed_24h,
+        "jobs_failed_last": jobs_failed_last,
         "storage_num": s.get("storage_num", 0),
         "total_capacity_bytes": total,
         "used_capacity_bytes": used,

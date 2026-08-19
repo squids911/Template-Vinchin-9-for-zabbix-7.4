@@ -29,10 +29,12 @@ STRINGS = {
             "через REST API. Требуется Zabbix Agent 2 с ключами vinchin.* и скриптом "
             "/etc/zabbix/scripts/vinchin_collect.py.",
         "tr_auth": "Авторизация/лицензия Vinchin не активна.",
-        "tr_failed24h": "За последние 24 часа были задания, завершившиеся с ошибкой.",
+        "tr_failed": "Одно или несколько заданий завершились с ошибкой в последнем запуске. "
+                     "Проблема закроется автоматически после успешного завершения следующего запуска этих заданий.",
         "tr_nodata": "Данные не поступают 5 минут — проверьте агент, конфиг и доступность API.",
-        "jp_failed": "Текущее состояние задания — Failed (4) или Abnormal (5).",
-        "jp_last_failed": "Последний запуск задания завершился ошибкой.",
+        "jp_failed": "Задание находится в состоянии Failed/Abnormal, либо его последний запуск завершился ошибкой. "
+                     "Проблема закроется автоматически после успешного запуска задания.",
+        "jp_stopped": "Задание остановлено или приостановлено — резервные копии не создаются по расписанию.",
         "sp_offline": "Хранилище офлайн (не смонтировано/недоступно).",
         "sp_high": "Занято >= {$VINCHIN.STORAGE.USED.HIGH}% объёма хранилища.",
         "sp_warn": "Занято >= {$VINCHIN.STORAGE.USED.WARN}% объёма хранилища.",
@@ -45,10 +47,12 @@ STRINGS = {
             "Requires Zabbix Agent 2 with the vinchin.* keys and the "
             "/etc/zabbix/scripts/vinchin_collect.py script.",
         "tr_auth": "Vinchin authorization/license is not active.",
-        "tr_failed24h": "Some jobs finished with an error in the last 24 hours.",
+        "tr_failed": "One or more jobs finished with an error in their last run. "
+                     "The problem clears automatically once those jobs complete successfully again.",
         "tr_nodata": "No data received for 5 minutes — check the agent, config and API availability.",
-        "jp_failed": "The job is currently in the Failed (4) or Abnormal (5) state.",
-        "jp_last_failed": "The last job run finished with an error.",
+        "jp_failed": "The job is in the Failed/Abnormal state or its last run finished with an error. "
+                     "The problem clears automatically once the job runs successfully.",
+        "jp_stopped": "The job is stopped or paused — backups are not running on schedule.",
         "sp_offline": "The storage is offline (unmounted/unavailable).",
         "sp_high": "Storage usage is >= {$VINCHIN.STORAGE.USED.HIGH}% of capacity.",
         "sp_warn": "Storage usage is >= {$VINCHIN.STORAGE.USED.WARN}% of capacity.",
@@ -212,6 +216,7 @@ def build(lang):
         ("vinchin.jobs.failed_total","Vinchin: Jobs failed (total)",     "UNSIGNED", "$.fail_num",                None, None),
         ("vinchin.jobs.abnormal",    "Vinchin: Jobs abnormal",           "UNSIGNED", "$.abnormal_num",            None, None),
         ("vinchin.jobs.failed_24h",  "Vinchin: Jobs failed (24h)",       "UNSIGNED", "$.failed_24h",              None, None),
+        ("vinchin.jobs.failed_last", "Vinchin: Jobs failed (last run)",  "UNSIGNED", "$.jobs_failed_last",        None, None),
         ("vinchin.tasks.current",    "Vinchin: Current tasks",           "UNSIGNED", "$.current_task_num",        None, None),
         ("vinchin.tasks.history",    "Vinchin: History tasks",           "UNSIGNED", "$.history_task_num",        None, None),
         ("vinchin.uptime_days",      "Vinchin: Uptime (days)",           "UNSIGNED", "$.uptime_days",             None, None),
@@ -239,10 +244,12 @@ def build(lang):
             attach_trigger(it, "trigger:auth",
                 "last(/" + TPL + "/vinchin.auth)=0",
                 "Vinchin: authorization problem", "HIGH", S["tr_auth"])
-        if it.findtext("key") == "vinchin.jobs.failed_24h":
+        if it.findtext("key") == "vinchin.jobs.failed_last":
+            # UUID сознательно оставлен от старого триггера (trigger:failed24h),
+            # чтобы при повторном импорте он обновился на месте, а не задвоился.
             attach_trigger(it, "trigger:failed24h",
-                "last(/" + TPL + "/vinchin.jobs.failed_24h)>0",
-                "Vinchin: backup jobs failed in last 24h", "AVERAGE", S["tr_failed24h"])
+                "last(/" + TPL + "/vinchin.jobs.failed_last)>0",
+                "Vinchin: backup jobs failed", "AVERAGE", S["tr_failed"])
         if it.findtext("key") == k("vinchin.summary"):
             attach_trigger(it, "trigger:nodata",
                 "nodata(/" + TPL + "/" + k("vinchin.summary") + ",5m)=1",
@@ -282,12 +289,15 @@ def build(lang):
         '$.rows[?(@.job_uuid == "{#JOB_UUID}")].last_start_time.first()',
         "vinchin.jobs"))
     tpr = sub(dr, "trigger_prototypes")
+    # Одно оповещение на задание (объединены «сейчас Failed/Abnormal» и «последний запуск с ошибкой»).
     tpr.append(make_trigger_proto("trigproto:job failed",
-        "last(/" + TPL + "/vinchin.job.status[{#JOB_UUID}])>=4",
-        "Vinchin: Job {#JOB_NAME} failed", "HIGH", S["jp_failed"]))
-    tpr.append(make_trigger_proto("trigproto:job last failed",
+        "last(/" + TPL + "/vinchin.job.status[{#JOB_UUID}])>=4 and "
+        "last(/" + TPL + "/vinchin.job.status[{#JOB_UUID}])<>99 or "
         "last(/" + TPL + "/vinchin.job.last_result[{#JOB_UUID}])=1",
-        "Vinchin: Job {#JOB_NAME} last run failed", "HIGH", S["jp_last_failed"]))
+        "Vinchin: Job {#JOB_NAME} failed", "HIGH", S["jp_failed"]))
+    tpr.append(make_trigger_proto("trigproto:job stopped",
+        "last(/" + TPL + "/vinchin.job.status[{#JOB_UUID}])=3",
+        "Vinchin: Job {#JOB_NAME} is stopped or paused", "WARNING", S["jp_stopped"]))
 
     # --- storages LLD ---
     dr = sub(drs, "discovery_rule")

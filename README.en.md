@@ -1,135 +1,181 @@
-# Vinchin Backup & Recovery monitoring via Zabbix 7.4 (Agent 2)
+# Monitoring Vinchin Backup & Recovery 9 with Zabbix 7.4 (Agent 2)
 
-A ready-to-use solution for monitoring **Vinchin Backup & Recovery v9** (Rocky Linux 9)
-with **Zabbix 7.4** and **Zabbix Agent 2**.
+A ready-made solution: the Zabbix agent polls the **Vinchin v9 REST API** (`/api/v1/*`)
+and feeds Zabbix with data about the **system state, storages and backup jobs**.
 
----
+Connection settings are **not stored in files** — they are set via **host macros** in Zabbix
+(`{$VINCHIN.URL}`, `{$VINCHIN.USERNAME}`, `{$VINCHIN.PASSWORD}`) and substituted into item keys.
 
-## Repository contents
+Works with Vinchin Backup & Recovery 9.x (tested on 9.0.0.92348, appliance OS — Rocky 9).
+
+## Contents
 
 | File | Purpose |
 |---|---|
-| `install_zabbix_agent2.sh` | **Auto-installer** — Zabbix Agent 2 + monitoring scripts |
-| `vinchin/vinchin_collect.py` | Collector script (Python 3, no pip dependencies) |
-| `vinchin/zabbix_agent2.d/userparameter_vinchin.conf` | UserParameter keys for the agent |
-| `vinchin/zbx_template_vinchin.xml` | Zabbix template (RU) |
-| `vinchin/zbx_template_vinchin_en.xml` | Zabbix template (EN) |
-| `vinchin/README.md` / `README.en.md` | Manuals |
+| `vinchin_collect.py` | Collector script (Python 3 + openssl, **no pip dependencies**) |
+| `zabbix_agent2.d/userparameter_vinchin.conf` | UserParameter keys for the agent |
+| `zbx_template_vinchin.xml` | Zabbix template, Russian descriptions (import into 7.4) |
+| `zbx_template_vinchin_en.xml` | Zabbix template, English descriptions (import into 7.4) |
+| `README.md` / `README.en.md` | Instructions (RU / EN) |
 
----
+> Both templates are the same template in two languages — identical structure and UUIDs,
+> only the descriptions differ. Import one of them.
 
-## Quick start — automatic installation
+## What is monitored
 
-Run this **directly on your Vinchin appliance** (Rocky Linux 9):
+**System state:**
+- Vinchin nodes: online/offline, version, number of offline service modules;
+- uptime, current/historical tasks, authorization/license status;
+- *(optional)* OS CPU/RAM/disk — with the standard `Linux by Zabbix agent` template, if the agent runs on the Vinchin appliance itself.
+
+**Storages:**
+- each storage: status (online/offline), used % and bytes, total/free;
+- triggers: offline, usage > 85% (warning), > 95% (high).
+
+**Jobs (backups):**
+- counters: running / waiting / failed / abnormal, jobs that failed in their last run, failures in the last 24 h;
+- per job (LLD): current status, last run result, last run start time and duration;
+- triggers: **one alert** per job (Failed/Abnormal or last run failed) + a warning if the job is stopped/paused.
+
+## How it works
+
+1. The agent (UserParameter `vinchin.*`) runs `vinchin_collect.py`, passing it the URL, username and password (from host macros, as key parameters).
+2. The script logs in to Vinchin (`POST /api/v1/login`: RSA-encrypted username/password + AES request signature); the token is cached in `/var/tmp/vinchin_zabbix_token.json` (10 min) and the script re-logs in automatically when it expires.
+3. The script returns JSON; Zabbix parses it with **dependent items** via JSONPath, and LLD automatically creates items and triggers for each job/storage/node.
+
+## Installation
+
+### 1. Install Zabbix Agent 2 on Vinchin (Rocky 9)
 
 ```bash
-# Download
-curl -fsSL -o install_zabbix_agent2.sh \
-  https://raw.githubusercontent.com/squids911/Template-Vinchin-9-for-zabbix-7.4/main/install_zabbix_agent2.sh
-
-# Execute
-bash install_zabbix_agent2.sh
+rpm -Uvh https://repo.zabbix.com/zabbix/7.4/release/rhel/9/noarch/zabbix-release-latest.el9.noarch.rpm
+dnf install -y zabbix-agent2
 ```
 
-The script will automatically:
+*(If you cannot touch the appliance — install the agent on any Linux host that can reach Vinchin over HTTPS.)*
 
-1. ✋ Ask for the **hostname** in Zabbix (custom or press Enter for default)
-2. 📦 Add the Zabbix 7.4 repository and install `zabbix-agent2` with plugins
-3. 📥 Download from this repo:
-   - `vinchin_collect.py` → `/etc/zabbix/scripts/`
-   - `userparameter_vinchin.conf` → `/etc/zabbix/zabbix_agent2.d/`
-4. 🔧 Generate `/etc/zabbix/zabbix_agent2.conf`
-5. 🔒 Configure SELinux contexts
-6. 🔥 Open port `10050/tcp` in firewalld
-7. ▶️ Start and enable the agent
-
-### After installation
-
-1. Import `zbx_template_vinchin_en.xml` into Zabbix (7.4+)
-2. Assign the template `Vinchin Backup and Recovery by API` to your host
-3. Set macros on the host level:
-
-| Macro | Description | Example |
-|---|---|---|
-| `{$VINCHIN.URL}` | Vinchin API URL | `https://127.0.0.1:443` |
-| `{$VINCHIN.USERNAME}` | Username | `admin` |
-| `{$VINCHIN.PASSWORD}` | Password (Secret text type) | `your_password` |
-
-> For passwords with special characters, use base64 encoding:
-> ```
-> b64:$(echo -n 'Pa$$w0rd!' | base64 -w0)
-> ```
-
----
-
-## Manual installation
-
-If you only need the collector script without reinstalling the agent:
+### 2. Deploy the files
 
 ```bash
-# Create directories
 mkdir -p /etc/zabbix/scripts /etc/zabbix/zabbix_agent2.d
 
-# Download script
-curl -fsSL -o /etc/zabbix/scripts/vinchin_collect.py \
-  https://raw.githubusercontent.com/squids911/Template-Vinchin-9-for-zabbix-7.4/main/vinchin/vinchin_collect.py
+# script
+cp vinchin_collect.py /etc/zabbix/scripts/
 chmod 755 /etc/zabbix/scripts/vinchin_collect.py
 
-# Download UserParameter configuration
-curl -fsSL -o /etc/zabbix/zabbix_agent2.d/userparameter_vinchin.conf \
-  https://raw.githubusercontent.com/squids911/Template-Vinchin-9-for-zabbix-7.4/main/vinchin/zabbix_agent2.d/userparameter_vinchin.conf
-
-# Restart the agent
-systemctl restart zabbix-agent2
+# agent keys
+cp zabbix_agent2.d/userparameter_vinchin.conf /etc/zabbix/zabbix_agent2.d/
 ```
 
----
+### 3. Configure the agent
 
-## Testing
+In `/etc/zabbix/zabbix_agent2.conf`:
 
-### Command line
+```
+Server=<Zabbix_server_IP>
+ServerActive=<Zabbix_server_IP>
+Hostname=<unique_host_name>
+Timeout=15
+```
+
+Restart it:
 
 ```bash
-/etc/zabbix/scripts/vinchin_collect.py \
-  --url https://127.0.0.1:443 \
-  --username admin \
-  --password "your_password" \
-  summary
+systemctl enable --now zabbix-agent2
 ```
 
-### Via Zabbix
+### 4. Verify a key (for debugging)
 
-1. Go to **Monitoring → Latest data**
-2. Find the host created during installation
-3. Filter: `vinchin` — you should see:
-   - `Vinchin: Summary JSON`
-   - `Vinchin: Jobs JSON`
-   - `Vinchin: Storages JSON`
-   - `Vinchin: Nodes JSON`
+```bash
+zabbix_agent2 -t 'vinchin.summary[https://VINCHIN_IP:54445,admin,b64:<base64_password>]'
+```
 
----
+(In a production install the agent runs as the `zabbix` user; if you test `-t` as root on Debian/Ubuntu — run `sudo -u zabbix zabbix_agent2 -t ...`.)
 
-## Monitored data
+### 5. On the Zabbix side
 
-| Category | Items |
+1. **Data collection → Templates → Import** → import `zbx_template_vinchin_en.xml` (or `zbx_template_vinchin.xml` for Russian descriptions).
+2. **Data collection → Hosts → Create host**: host name = `Hostname` from the agent config, interface = Vinchin IP (port 10050).
+3. Link the `Linux by Zabbix agent` template (for OS CPU/RAM/disk) if the agent runs on Vinchin.
+4. Link the **“Vinchin Backup and Recovery by API”** template to the host.
+5. **Set the host macros** (Host → Macros → Inherited and host macros):
+
+   | Macro | Value |
+   |---|---|
+   | `{$VINCHIN.URL}` | `https://<Vinchin_IP_or_hostname>:54445` |
+   | `{$VINCHIN.USERNAME}` | login, e.g. `admin` |
+   | `{$VINCHIN.PASSWORD}` | `b64:<base64_password>` |
+
+6. Data appears within 1–5 minutes; LLD creates items/triggers for jobs, storages and nodes.
+
+## The `{$VINCHIN.PASSWORD}` macro and `b64:`
+
+Zabbix does not allow some characters in item keys (`!`, `#`, `@`, etc.), so the password
+is passed **base64-encoded** with a `b64:` prefix — the script decodes it back.
+
+Encode the password:
+
+```bash
+echo -n 'YourPassword' | base64
+```
+
+and set the macro to `b64:<result>`, e.g. `b64:IVYzYjcjTHI=`. Do not add leading/trailing spaces.
+
+- If the username also contains special characters (e.g. an e-mail), set it the same way: `b64:<base64>`.
+- The `{$VINCHIN.PASSWORD}` macro is declared as **secret** (SECRET_TEXT) in the template — its value is hidden in the web UI and is not included in template exports.
+
+## Key reference (UserParameter)
+
+| Key | Returns |
 |---|---|
-| **Summary** | Running/waiting/failed/abnormal jobs, storage status, uptime |
-| **Jobs** | UUID, name, type, status, progress, schedule, last result |
-| **Storages** | UUID, name, type, node, capacity (total/used/free), status |
-| **Nodes** | UUID, name, IP, status, version, modules (offline count) |
+| `vinchin.summary[url,user,pass]` | JSON summary (jobs, storage, uptime, authorization) |
+| `vinchin.jobs[url,user,pass]` | JSON: current jobs + status/result of the last run |
+| `vinchin.storages[url,user,pass]` | JSON: storages (status, total/free/used, %) |
+| `vinchin.nodes[url,user,pass]` | JSON: nodes (online, version, offline modules) |
 
----
+Discovery (`vinchin.discover.*`) is not needed: the discovery rules in the template are
+**dependent** on the master items above and take data from their JSON.
 
-## Requirements
+## Script options (manual run / debugging)
 
-- **Vinchin Backup & Recovery** 9.x (tested on 9.0.0.92348)
-- **OS**: Rocky Linux 9 (appliance)
-- **Zabbix** 7.0 / 7.4
-- **Python** 3.9+ (stdlib only)
-- **OpenSSL** 1.1+ / 3.x
+```bash
+python3 vinchin_collect.py summary --url https://host:54445 --username admin --password 'b64:IVYzYjcjTHI='
+```
 
----
+Commands: `summary` | `jobs` | `storages` | `nodes`.
+Fallback alternatives: `--config /path.json` or the `VINCHIN_URL` / `VINCHIN_USERNAME` / `VINCHIN_PASSWORD` environment variables.
 
-## License
+## Template triggers
 
-MIT
+- **High:** job Failed/Abnormal or its last run finished with an error (one alert per job); node offline; storage offline; storage usage ≥ 95%; authorization problem.
+- **Average:** one or more jobs finished with an error in their last run (closes automatically once those jobs complete successfully again).
+- **Warning:** job stopped/paused; storage usage ≥ 85%; a node has offline modules; no data for 5 minutes.
+
+Thresholds are configurable via the `{$VINCHIN.STORAGE.USED.WARN}` / `{$VINCHIN.STORAGE.USED.HIGH}` macros.
+
+## About trigger recovery
+
+All triggers use **expression-based recovery** (the default mode): a problem closes automatically
+as soon as the problem expression becomes false again. No separate recovery expression is needed:
+
+- `authorization problem` — closes when authorization/license is active again (`auth=1`);
+- `backup jobs failed` — closes when the affected jobs complete successfully again (the count of jobs that failed their last run drops to 0), instead of waiting for a 24-hour window to elapse;
+- `no data collected` (`nodata()`) — closes as soon as data starts flowing again;
+- prototype `Job {#JOB_NAME} failed` — closes when the job is healthy again (not Failed/Abnormal and its last run succeeded);
+- prototype `Job {#JOB_NAME} is stopped or paused` — closes when the job is active again;
+- storage/node prototypes — close when the storage/node is healthy again.
+
+## Updating the template (re-import)
+
+If the template was imported before, on re-import:
+1. Enable **Delete missing** for **Trigger prototypes** — otherwise the old duplicate trigger `Job {#JOB_NAME} last run failed` will remain and keep producing a second alert.
+2. The other rules can be left as is (Create new / Update existing).
+
+## Notes
+
+- Vinchin uses a **self-signed HTTPS certificate** — the script uses TLS without certificate verification (just like the web UI itself).
+- The Vinchin token lives for ~15 minutes of inactivity; the script re-logs in automatically (error codes 910086/910087).
+- The API requires the `Accept: application/json` header and a browser `User-Agent` — the script handles this.
+- If you have more than 500 jobs/storages, increase `limit` inside the `jobs`/`storages`/`nodes` commands in the script.
+- The token cache (`/var/tmp/vinchin_zabbix_token.json`) stores only a temporary session token, never the password.
+- It is recommended to create a dedicated observer user in Vinchin (global observer in v9) for monitoring.
